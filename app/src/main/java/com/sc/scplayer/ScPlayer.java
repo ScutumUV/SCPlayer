@@ -18,27 +18,27 @@ public class ScPlayer {
         this.surface = surface;
     }
 
-    private void setUrl(String urlOrPath) {
+    public void setUrlOrPath(String urlOrPath) {
+        native_setUrl(urlOrPath);
+    }
+
+    public void start() {
 
     }
 
-    private void start() {
+    public void resume() {
 
     }
 
-    private void resume() {
+    public void pause() {
 
     }
 
-    private void pause() {
-
-    }
-
-    private void destroy() {
+    public void destroy() {
 
     }
 
     public native void native_setUrl(String url);
 
-    public native void native_start();
+    public native void native_play();
 }
