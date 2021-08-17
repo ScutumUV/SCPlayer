@@ -12,6 +12,7 @@ include_directories(include)
 
 #添加一个系统查找目录——添加系统环境变量
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -L${CMAKE_SOURCE_DIR}/lib/${ANDROID_ABI}")
+
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
 # You can define multiple libraries, and CMake builds them for you.
@@ -24,7 +25,13 @@ add_library( # Sets the name of the library.
         SHARED
 
         # Provides a relative path to your source file(s).
-        native-lib.cpp)
+        ScWrapper.cpp
+        ScLog.cpp
+        ScQueue.cpp
+        ScVideo.cpp
+        ScAudio.cpp
+        ScManager.cpp
+        )
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
@@ -54,4 +61,6 @@ target_link_libraries( # Specifies the target library.
         swscale
         # Links the target library to the log library
         # included in the NDK.
-        ${log-lib})
+        ${log-lib}
+        android
+        )

@@ -1,23 +1,18 @@
 package com.sc.scplayer;
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-
 import android.os.Bundle;
-import android.os.Environment;
-import android.view.Surface;
-import android.view.SurfaceHolder;
+import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
 import android.widget.TextView;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import java.io.File;
 
 public class MainActivity extends AppCompatActivity {
 
     private SurfaceView surfaceView;
-    private SurfaceHolder.Callback callback;
-    private Surface surface;
 
     private ScPlayer scPlayer;
 
@@ -26,65 +21,38 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         surfaceView = findViewById(R.id.surfaceView);
-        if (callback == null) {
-            callback = new SurfaceHolder.Callback() {
-                @Override
-                public void surfaceCreated(@NonNull SurfaceHolder holder) {
-                    surface = holder.getSurface();
-                    scPlayer = new ScPlayer(surface);
-                }
-
-                @Override
-                public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
-
-                }
-
-                @Override
-                public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
-
-                }
-            };
-        }
-        surfaceView.getHolder().addCallback(callback);
+        scPlayer = new ScPlayer(surfaceView);
         TextView tv = findViewById(R.id.sample_text);
-        tv.setText(stringFromJNI());
+//        tv.setText(stringFromJNI());
 
     }
 
-    public native String stringFromJNI();
-
     public void startPlay(View view) {
-        String p1 = Environment.getDataDirectory().getAbsolutePath();
-        String p2 = Environment.getRootDirectory().getAbsolutePath();
-        String p3 = Environment.getExternalStorageDirectory().getAbsolutePath();
-        File f1 = new File(p1);
-        File f2 = new File(p2);
-        File f3 = new File(p3);
-        if (f1.exists() && f1.isDirectory()) {
-            File[] fs = f1.listFiles();
-            if (fs != null) {
-
+//        String path = "http://ivi.bupt.edu.cn/hls/cctv1hd.m3u8";
+//        String path = "https://cctvalih5c.v.myalicdn.com/live/cdrmcctv1_1td.m3u8";
+//        String path = ScFile.getVideoPath() + File.separator + "test1.mp4";
+//        String path = ScFile.getVideoPath() + File.separator + "test1.mp3";
+//        String path = ScFile.getVideoPath() + File.separator + "test2.mp4";
+//        String path = ScFile.getVideoPath() + File.separator + "test3.mp4";
+        String path = ScFile.getVideoPath() + File.separator + "test4.mp4";
+//        String path = ScFile.getVideoPath() + File.separator + "test5.mp4";
+        if (!path.contains("http") && !path.contains("https")) {
+            File file = new File(path);
+            if (!file.exists()) {
+                Log.e("scme_init", "视频文件不存在");
+                return;
             }
-        }
-        if (f2.exists() && f2.isDirectory()) {
-            File[] fs = f2.listFiles();
-            if (fs != null) {
-
-            }
-        }
-        if (f3.exists() && f3.isDirectory()) {
-            File[] fs = f3.listFiles();
-            if (fs != null) {
-
-            }
-        }
-        String path = Environment.getDataDirectory().getAbsolutePath() + File.separator + "system" + File.separator + "test.mp4";
-        File file = new File(path);
-        if (!file.exists()) {
-            return;
         }
         if (scPlayer != null) {
             scPlayer.setUrlOrPath(path);
+//            scPlayer.setUrlOrPath("http://ivi.bupt.edu.cn/hls/cctv1hd.m3u8");
+            scPlayer.start();
+        }
+    }
+
+    public void stopPlay(View view) {
+        if (scPlayer != null) {
+            scPlayer.stop();
         }
     }
 }
