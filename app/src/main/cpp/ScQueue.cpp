@@ -16,7 +16,9 @@ ScQueue::~ScQueue() {
 }
 
 int ScQueue::push(AVPacket *packet) {
-    queuePacket.push(packet);
+    LOGQ("ScQueue====> push size1");
+    LOGQ("ScQueue====> push size2=%d", size());
+    queuePacket.push_back(packet);
     return 0;
 }
 
@@ -25,7 +27,7 @@ AVPacket *ScQueue::getAvPacket() {
     if (!queuePacket.empty()) {
 //        LOGQ("ScQueue====> size1=%d", size());
         packet = queuePacket.front();
-        queuePacket.pop();
+        queuePacket.pop_front();
 //        LOGQ("ScQueue====> size2=%d", size());
 //        LOGQ("ScQueue ===> packet=%p, packet.size=%d", packet, packet->size);
     }
@@ -47,9 +49,13 @@ int ScQueue::size() {
 }
 
 void ScQueue::clearAvPacket() {
-    std::queue<AVPacket *> empty;
-    swap(empty, queuePacket);
+    queuePacket.clear();
+//    std::queue<AVPacket *> empty;
+//    swap(empty, queuePacket);
+//    pthread_exit(nullptr);
+}
+
+void ScQueue::release() {
     pthread_mutex_destroy(&mutexPacket);
     pthread_cond_destroy(&condPacket);
-//    pthread_exit(nullptr);
 }

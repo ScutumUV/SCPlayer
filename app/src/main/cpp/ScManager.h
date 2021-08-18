@@ -26,14 +26,24 @@ public:
 
     static ScManager &getInstance();
 
+
     JavaVM *vm;
     JNIEnv *env;
-    jobject joPlayer;
+    jobject joLifecyclerImpl;
+    jobject joController;
     jobject joSurface;
     //反射得到需要回调的java方法
+    jmethodID methodStatusHasChanged;
     jmethodID methodOnSizeChange;
     jmethodID methodCreateAudioTrack;
-    jmethodID methodPlayAudio;;
+    jmethodID methodPlayAudio;
+
+    void setUrl(JNIEnv *e, jobject thiz, const char *url);
+
+    void setController(JNIEnv *env, jobject thiz);
+
+    void setSurface(JNIEnv *env, jobject thiz, jobject surface);
+
 
     //是否已经开始解码
     bool isStart;
@@ -57,15 +67,26 @@ public:
     int streamIndexSubtitle;
     ScQueue *subtitleQueue;
 
+    //视频总时长
+    long duration;
+
     pthread_t threadDecodePacket;
 
-    void setJava(JNIEnv *e, jobject javaPlayer, jobject surface, const char *url);
+    AVStream *getAvstream(int index);
 
     void startPlay();
 
     void stopPlay();
 
-    AVStream *getAvstream(int index);
+    void release();
+
+    void forward();
+
+    void rewind();
+
+    void doubleSpeed(float doubleB);
+
+    void seek(int progress);
 
 private:
 

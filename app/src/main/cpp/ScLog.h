@@ -31,6 +31,7 @@ public:
 #define LOGIA(...) __android_log_print(ANDROID_LOG_INFO,"scme_init_a", __VA_ARGS__)
 #define LOGD(...) __android_log_print(ANDROID_LOG_INFO,"scme_h264", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_INFO,"scme_decode_v", __VA_ARGS__)
+#define LOGET(...) __android_log_print(ANDROID_LOG_INFO,"scme_decode_vT", __VA_ARGS__)
 #define LOGEERROR(...) __android_log_print(ANDROID_LOG_ERROR,"scme_decode_v", __VA_ARGS__)
 #define LOGEA(...) __android_log_print(ANDROID_LOG_INFO,"scme_decode_a", __VA_ARGS__)
 #define LOGEAERROR(...) __android_log_print(ANDROID_LOG_ERROR,"scme_decode_a", __VA_ARGS__)

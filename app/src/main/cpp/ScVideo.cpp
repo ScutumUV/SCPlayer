@@ -46,9 +46,9 @@ void ScVideo::startPlay() {
     }
 
     //回调方法
-    if (ScManager::getInstance().env != nullptr && ScManager::getInstance().joPlayer != nullptr && ScManager::getInstance().methodOnSizeChange != nullptr) {
+    if (ScManager::getInstance().env != nullptr && ScManager::getInstance().joController != nullptr && ScManager::getInstance().methodOnSizeChange != nullptr) {
         if (LOGS_ENABLED) LOGI("video start callback onSizeChange() method");
-        ScManager::getInstance().env->CallVoidMethod(ScManager::getInstance().joPlayer, ScManager::getInstance().methodOnSizeChange, rgbWidth, rgbHeight);
+        ScManager::getInstance().env->CallVoidMethod(ScManager::getInstance().joController, ScManager::getInstance().methodOnSizeChange, rgbWidth, rgbHeight);
     }
 
     //获得单帧时间序号
@@ -58,8 +58,7 @@ void ScVideo::startPlay() {
     //初始化常规视频速度
     defaultVideoSpeed = 1 / fps;
     if (LOGS_ENABLED) {
-        LOGI("视频singleVideoTime=%f", singleVideoTime);
-        LOGI("视频defaultVideoSpeed=%f", defaultVideoSpeed);
+        LOGET("视频singleVideoTime=%f, defaultVideoSpeed=%f, fps=%f", singleVideoTime, defaultVideoSpeed, fps);
     }
 
     //转换成rgb容器的大小
@@ -92,6 +91,11 @@ void *ScVideo::decodeVideo(void *pVoid) {
     LOGE("decodeVideo ===> start");
     AVFrame *videoFrame;
     while (ScManager::getInstance().isStart) {
+        //如果正在拖拽中,进行休眠100ms
+        if (ScManager::getInstance().isSeek) {
+            av_usleep(1000 * 100);
+            continue;
+        }
         //从队列中取出数据 h264数据
         AVPacket *videoPacket = ScManager::getInstance().videoQueue->getAvPacket();
         if (videoPacket == nullptr) {
@@ -117,7 +121,8 @@ void *ScVideo::decodeVideo(void *pVoid) {
         LOGE("decodeVideo ===> ret2=%d", ret);
         //videoFrame.data 为原始数据
         LOGE("decodeVideo ===> avFrame.data=%d", videoFrame->linesize[0]);
-        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+//        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+        if (ret == AVERROR_EOF) {
             //已经读完了
             break;
         }
@@ -134,21 +139,18 @@ void *ScVideo::decodeVideo(void *pVoid) {
         double pts = videoFrame->best_effort_timestamp;
         //不是指时间  指的序号
         ScManager::getInstance().scVideo->videoNowTime = pts * ScManager::getInstance().scVideo->singleVideoTime;
-        LOGE("decodeVideo ===> videoNowTime=%f", ScManager::getInstance().scVideo->videoNowTime);
         if (ScManager::getInstance().scAudio != nullptr) {
             //算出音视频相差的时间（保证在3ms以内，就认为音视频是同步的）
             //正数：音频超前   负数：视频超前
-            double diff = ScManager::getInstance().scAudio->audioNowTime -
-                          ScManager::getInstance().scVideo->videoNowTime;
+            double diff = ScManager::getInstance().scAudio->audioNowTime - ScManager::getInstance().scVideo->videoNowTime;
             //计算出对应的延迟时间
             double delayTime = ScManager::getInstance().scVideo->getDelayTime(diff);
-            LOGE("decodeVideo ===> delayTime=%f", delayTime);
-            double sleepTime = delayTime * 1000000;
-            LOGE("decodeAudio ===> sleepTime=%f", sleepTime);
-            //音视频同步进行动态休眠
-            if (sleepTime > 0) {
-                av_usleep(sleepTime);
-            }
+            //换算成微秒
+            double sleepTime = delayTime * AV_TIME_BASE;
+            LOGET("decodeVideo ===> defaultVideoSpeed=%f, pts=%f, singleVideoTime=%f, audioNowTime=%f, videoNowTime=%f, diff=%f, delayTime=%f, sleepTime=%f", ScManager::getInstance().scVideo->defaultVideoSpeed,
+                    pts, ScManager::getInstance().scVideo->singleVideoTime, ScManager::getInstance().scAudio->audioNowTime, ScManager::getInstance().scVideo->videoNowTime, diff, delayTime, sleepTime);
+            //音视频同步进行动态休眠s
+            av_usleep(sleepTime);
         }
 
         //相当于将起始数据 copy 到 终止数据中，在copy的过程中就已经yuv数据转换成rgb数据，然后就可以渲染到surfaceView中了
@@ -179,12 +181,15 @@ void *ScVideo::decodeVideo(void *pVoid) {
         av_free(videoPacket);
         videoPacket = nullptr;
     }
-    av_frame_free(&videoFrame);
-    ScManager::getInstance().scVideo->stopPlay();
+//    if (videoFrame != nullptr) {
+//        av_frame_free(&videoFrame);
+//    }
+//    ScManager::getInstance().scVideo->stopPlay();
     return nullptr;
 }
 
 void ScVideo::stopPlay() {
+    LOGE("decodeAudio ===> stopPlay");
     av_freep(avCodecContext);
     avcodec_close(avCodecContext);
     avCodecContext = nullptr;
@@ -193,7 +198,6 @@ void ScVideo::stopPlay() {
     swsContext = nullptr;
     av_frame_free(&avFrame);
     avFrame = nullptr;
-    LOGE("decodeAudio ===> stopPlay");
 }
 
 void ScVideo::realease() {
@@ -203,33 +207,32 @@ void ScVideo::realease() {
 /**
  * 根据音视频时间差计算对应的延迟时间, 保证在3ms以内,就认为音视频是同步的
  * @param diff 音视频时间差
- * @return 延迟时间     单位: 微秒
+ * @return 延迟时间     单位: 秒
  */
 double ScVideo::getDelayTime(double diff) {
     double delayTime = 0;
     //音频超前，  视频在常规速度的基础上加快 视频速度在目前的视频速度基础上扩大1.5倍，同时也在  0.5倍常规速度~2倍常规速度之间
     if (diff > 0.003) {
         //在目前的速度上扩大1.5倍  0.5倍常规速度~2倍常规速度之间
-        delayTime = delayTime * 3 / 2;
+        delayTime = diff * 3 / 2;
         //如果小于二分之一，弄成三分之二
         if (delayTime < defaultVideoSpeed / 2) {
-            //1.5倍
-            delayTime = defaultVideoSpeed * 2 / 3;
-        } else if (delayTime > defaultVideoSpeed * 2) {
-            //最大2倍
-            delayTime = defaultVideoSpeed * 2;
+            delayTime = defaultVideoSpeed * 3 / 2;
+        } else if (delayTime > defaultVideoSpeed * 10) {
+            delayTime = defaultVideoSpeed * 10;
         }
+        delayTime = - delayTime;
     }
     //视频超前， 视频在常规速度的基础上减慢
     else if (diff < -0.003) {
         //在  0.5倍常规速度~2倍常规速度之间
         //默认减慢为视频速度基础的2/3
-        delayTime = delayTime * 2 / 3;
+        delayTime = -diff * 2 / 3;
         //如果小于二分之一，弄成三分之二
         if (delayTime < defaultVideoSpeed / 2) {
-            delayTime = defaultVideoSpeed / 2;
-        } else if (delayTime > defaultVideoSpeed * 2) {
-            delayTime = defaultVideoSpeed * 2;
+            delayTime = defaultVideoSpeed * 2 / 3;
+        } else if (delayTime > defaultVideoSpeed * 10) {
+            delayTime = defaultVideoSpeed * 10;
         }
     }
     return delayTime;

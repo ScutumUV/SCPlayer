@@ -51,10 +51,10 @@ void ScAudio::startPlay() {
     swr_init(swrContext);
 
     //回调方法
-    if (ScManager::getInstance().env != nullptr && ScManager::getInstance().joPlayer != nullptr && ScManager::getInstance().methodCreateAudioTrack != nullptr) {
+    if (ScManager::getInstance().env != nullptr && ScManager::getInstance().joController != nullptr && ScManager::getInstance().methodCreateAudioTrack != nullptr) {
         if (LOGS_ENABLED) LOGI("video start callback onSizeChange() method");
-//        ScManager::getInstance().env->CallVoidMethod(ScManager::getInstance().joPlayer, ScManager::getInstance().methodCreateAudioTrack, 441avCodecContext->sample_rate00, avCodecContext->channel_layout);
-        ScManager::getInstance().env->CallVoidMethod(ScManager::getInstance().joPlayer, ScManager::getInstance().methodCreateAudioTrack, 44100, av_get_channel_layout_nb_channels(AV_CH_LAYOUT_STEREO));
+//        ScManager::getInstance().env->CallVoidMethod(ScManager::getInstance().joController, ScManager::getInstance().methodCreateAudioTrack, 441avCodecContext->sample_rate00, avCodecContext->channel_layout);
+        ScManager::getInstance().env->CallVoidMethod(ScManager::getInstance().joController, ScManager::getInstance().methodCreateAudioTrack, 44100, av_get_channel_layout_nb_channels(AV_CH_LAYOUT_STEREO));
     }
 
     //获取时间基,根据哥伦布编码存的时间序号需要依赖于timeBase
@@ -71,9 +71,9 @@ void *ScAudio::decodeAudio(void *pVoid) {
     AVFrame *audioFrame;
 
     while (ScManager::getInstance().isStart) {
-        //如果是在拖动进度条的过程中
+        //如果正在拖拽中,进行休眠100ms
         if (ScManager::getInstance().isSeek) {
-            av_usleep(1000*10);
+            av_usleep(1000 * 100);
             continue;
         }
         //从队列中取出数据 h264数据
@@ -82,13 +82,10 @@ void *ScAudio::decodeAudio(void *pVoid) {
           audioPacket = ScManager::getInstance().audioQueue->getAvPacket();
         if (audioPacket == nullptr) {
             av_packet_free(&audioPacket);
-//            av_free(audioPacket);
+            av_free(audioPacket);
             audioPacket = nullptr;
-//            LOGEA("decodeAudio ===> audioPacket is null");
             continue;
         }
-//        LOGEA("decodeAudio ===> audioPacket.size=%d ,index=%d ,data=%s", audioPacket->size, audioPacket->stream_index, audioPacket->data);
-        LOGEA("decodeAudio ===> audioPacket.size=%d ,index=%d", audioPacket->size, audioPacket->stream_index);
         //解码
         int ret = avcodec_send_packet(ScManager::getInstance().scAudio->avCodecContext, audioPacket);
         if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
@@ -100,7 +97,8 @@ void *ScAudio::decodeAudio(void *pVoid) {
         //返回结果==0，代表解码成功，但并不代表渲染成功
         ret = avcodec_receive_frame(ScManager::getInstance().scAudio->avCodecContext, audioFrame);
         LOGEA("decodeAudio ===> ret2=%d", ret);
-        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+//        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+        if (ret == AVERROR_EOF) {
             //已经读完了
             break;
         }
@@ -115,7 +113,7 @@ void *ScAudio::decodeAudio(void *pVoid) {
 
         //获取当前帧的时间
         ScManager::getInstance().scAudio->audioNowTime = audioFrame->pts * ScManager::getInstance().scAudio->singleAudioTime;
-        LOGEA("decodeAudio ===> audioNowTime=%f", ScManager::getInstance().scAudio->audioNowTime);
+        LOGET("decodeAudio ===> pts=%d, singleAudioTime=%f, audioNowTime=%f", audioFrame->pts, ScManager::getInstance().scAudio->singleAudioTime, ScManager::getInstance().scAudio->audioNowTime);
 
         swr_convert(ScManager::getInstance().scAudio->swrContext, &outBuffer, 44100 * 2,
                     //输入的数据
@@ -131,8 +129,7 @@ void *ScAudio::decodeAudio(void *pVoid) {
         //绑定线程
         JNIEnv *jniEnv;
         //回调方法
-        if (ScManager::getInstance().vm == nullptr ||
-            ScManager::getInstance().vm->AttachCurrentThread(&jniEnv, 0) != JNI_OK) {
+        if (ScManager::getInstance().vm == nullptr || ScManager::getInstance().vm->AttachCurrentThread(&jniEnv, 0) != JNI_OK) {
             /*av_frame_free(&audioFrame);
             av_free(audioFrame);
             audioFrame = nullptr;
@@ -147,7 +144,7 @@ void *ScAudio::decodeAudio(void *pVoid) {
         jniEnv->SetByteArrayRegion(byteArray, 0, size, (const jbyte *)(outBuffer));
 //            jniEnv->CallVoidMethod(ScManager::getInstance().joPlayer, ScManager::getInstance().methodCreateAudioTrack, audioContext->sample_rate, audioContext->channel_layout);
         //回调给java层
-        jniEnv->CallVoidMethod(ScManager::getInstance().joPlayer, ScManager::getInstance().methodPlayAudio, byteArray, size);
+        jniEnv->CallVoidMethod(ScManager::getInstance().joController, ScManager::getInstance().methodPlayAudio, byteArray, size);
         jniEnv->DeleteLocalRef(byteArray);
         //将线程给剥离出来
         ScManager::getInstance().vm->DetachCurrentThread();

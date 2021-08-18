@@ -26,7 +26,8 @@ public:
     void getAvPacket(AVPacket *packet);
     int size();
     void clearAvPacket();
-    std::queue<AVPacket *> queuePacket;
+    void release();
+    std::deque<AVPacket *> queuePacket;
     pthread_mutex_t mutexPacket;
     pthread_cond_t condPacket;
     bool playStatus = false;

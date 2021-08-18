@@ -42,9 +42,9 @@ public:
     int rgbWidth;
     //rgb高度
     int rgbHeight;
-    //当前帧时间
+    //当前帧时间 s
     double videoNowTime;
-    //视频帧的单位时间
+    //视频帧的单位时间 s
     double singleVideoTime;
     //视频常规速度 = 1s / 帧率
     double defaultVideoSpeed;
